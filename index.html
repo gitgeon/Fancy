@@ -23,7 +23,7 @@
     .container { max-width: 540px; margin: 0 auto; background: var(--card); padding: 20px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
     h1 { font-size: 20px; margin: 0 0 16px; text-align: center; color: #0f172a; }
     .meta-group { margin-bottom: 16px; }
-    .meta-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: #475569; }
+    .meta-group label, .memo-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: #475569; }
     .meta-group input { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 15px; }
     
     .question-item { padding: 14px 0; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 12px; }
@@ -38,22 +38,54 @@
     #photoInput { display: none; }
     #previewImg { max-width: 100%; max-height: 240px; margin-top: 12px; border-radius: 8px; display: none; }
 
-    .submit-btn { width: 100%; margin-top: 24px; padding: 14px; background: var(--primary); color: #fff; border: none; border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer; }
+    .memo-group { margin-top: 18px; }
+    .memo-group textarea {
+      width: 100%;
+      min-height: 84px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 14px;
+      line-height: 1.5;
+      resize: vertical;
+    }
+
+    .submit-btn { width: 100%; margin-top: 20px; padding: 14px; background: var(--primary); color: #fff; border: none; border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer; }
     .submit-btn:disabled { background: #94a3b8; cursor: not-allowed; }
     #statusMsg { margin-top: 12px; text-align: center; font-size: 14px; font-weight: 600; }
 
-    /* PDF 출력용 숨김 영역 (A4 비율 고정) */
+    /* PDF 출력용 숨김 영역 */
     #pdfReport {
       position: fixed; left: -9999px; top: 0;
       width: 794px; padding: 40px; background: #fff; color: #000;
     }
-    #pdfReport h2 { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
-    #pdfReport table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 14px; }
-    #pdfReport th, #pdfReport td { border: 1px solid #333; padding: 8px 10px; text-align: left; }
+    #pdfReport h2 { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 14px; }
+    .pdf-info-box {
+      display: flex;
+      justify-content: space-between;
+      background: #f1f5f9;
+      border: 1px solid #333;
+      padding: 10px 14px;
+      margin-bottom: 14px;
+      font-size: 14px;
+      font-weight: bold;
+    }
+    #pdfReport table { width: 100%; border-collapse: collapse; margin-bottom: 14px; font-size: 13px; }
+    #pdfReport th, #pdfReport td { border: 1px solid #333; padding: 7px 10px; text-align: left; }
     #pdfReport th { background: #f1f5f9; text-align: center; }
     #pdfReport td.ans { text-align: center; font-weight: bold; width: 60px; }
-    #pdfPhotoArea { text-align: center; margin-top: 16px; }
-    #pdfPhotoArea img { max-width: 480px; max-height: 320px; border: 1px solid #ccc; }
+    
+    .pdf-memo-box {
+      border: 1px solid #333;
+      padding: 10px 12px;
+      margin-bottom: 14px;
+      font-size: 13px;
+      background: #fafafa;
+      white-space: pre-wrap;
+      line-height: 1.5;
+    }
+    #pdfPhotoArea { text-align: center; margin-top: 10px; }
+    #pdfPhotoArea img { max-width: 460px; max-height: 280px; border: 1px solid #ccc; }
   </style>
 </head>
 <body>
@@ -63,7 +95,7 @@
 
   <div class="meta-group">
     <label for="inspectorName">점검자 성명</label>
-    <input type="text" id="inspectorName" placeholder="이름을 입력하세요" />
+    <input type="text" id="inspectorName" name="inspectorName" placeholder="이름을 입력하세요" autocomplete="name" />
   </div>
 
   <div id="questionsContainer"></div>
@@ -74,14 +106,22 @@
     <div><img id="previewImg" alt="점검 사진 미리보기" /></div>
   </div>
 
-  <button id="submitBtn" class="submit-btn" onclick="generateAndSend()">PDF 생성 및 이메일 전송</button>
+  <div class="memo-group">
+    <label for="memoInput">📝 특이사항 메모 (선택)</label>
+    <textarea id="memoInput" placeholder="X 항목 조치 내용이나 현장 특이사항이 있으면 입력하세요."></textarea>
+  </div>
+
+  <button type="button" id="submitBtn" class="submit-btn" onclick="generateAndSend()">PDF 생성 및 이메일 전송</button>
   <div id="statusMsg"></div>
 </div>
 
 <!-- PDF 변환용 템플릿 -->
 <div id="pdfReport">
   <h2>일일 안전 점검 결과 보고서</h2>
-  <p id="pdfMeta"></p>
+  <div class="pdf-info-box">
+    <span>점검자 성명: <span id="pdfInspector">-</span></span>
+    <span>점검 일시: <span id="pdfDate">-</span></span>
+  </div>
   <table>
     <thead>
       <tr>
@@ -92,17 +132,20 @@
     </thead>
     <tbody id="pdfTableBody"></tbody>
   </table>
+  <div class="pdf-memo-box">
+    <div style="font-weight:bold; margin-bottom:4px;">[특이사항 메모]</div>
+    <div id="pdfMemoText"></div>
+  </div>
   <div id="pdfPhotoArea">
-    <p style="font-weight:bold; text-align:left;">[현장 첨부 사진]</p>
+    <p style="font-weight:bold; text-align:left; font-size:13px; margin-bottom:6px;">[현장 첨부 사진]</p>
     <img id="pdfImg" />
   </div>
 </div>
 
 <script>
-  // ★ 1단계에서 복사한 Google Apps Script 웹 앱 URL을 아래에 붙여넣으세요 ★
+  // ★ 본인의 Google Apps Script 웹 앱 URL을 아래 따옴표 안에 붙여넣으세요 ★
   const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwTpgy8euCn9B1Q6o46_9rqQDcrNDoP4bnJ-2uMbmEHL3dplNmvm8ksQjjmjjcZmhPt/exec";
 
-  // 10개 점검 질문 (원하시는 내용으로 수정 가능)
   const QUESTIONS = [
     "1. 작업 전 개인 보호구(안전모, 안전화 등)를 올바르게 착용하였는가?",
     "2. 작업장 주변 바닥의 정리정돈 및 미끄럼 방지 상태가 양호한가?",
@@ -140,7 +183,7 @@
     document.getElementById(`btn-x-${index}`).className = "ox-btn" + (val === "X" ? " active-x" : "");
   }
 
-  // 사진 선택 및 자동 압축 (가로 최대 800px 리사이징)
+  // 사진 선택 및 자동 압축
   document.getElementById("photoInput").addEventListener("change", function(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -175,77 +218,25 @@
 
   // PDF 생성 및 이메일 발송
   async function generateAndSend() {
-    const inspector = document.getElementById("inspectorName").value.trim();
+    const inspectorEl = document.getElementById("inspectorName");
+    const inspector = inspectorEl ? inspectorEl.value.trim() : "";
+    const memo = document.getElementById("memoInput").value.trim();
     const statusMsg = document.getElementById("statusMsg");
     const submitBtn = document.getElementById("submitBtn");
 
-    if (!inspector) { alert("점검자 성명을 입력해 주세요."); return; }
-    if (answers.includes(null)) { alert("10개 항목 모두 O 또는 X를 선택해 주세요."); return; }
-    if (!compressedImageBase64) { alert("현장 사진을 촬영하거나 선택해 주세요."); return; }
+    if (!inspector) {
+      alert("점검자 성명을 입력해 주세요.");
+      if (inspectorEl) inspectorEl.focus();
+      return;
+    }
+    if (answers.includes(null)) {
+      alert("10개 항목 모두 O 또는 X를 선택해 주세요.");
+      return;
+    }
+    if (!compressedImageBase64) {
+      alert("현장 사진을 촬영하거나 선택해 주세요.");
+      return;
+    }
 
     submitBtn.disabled = true;
-    statusMsg.style.color = "#2563eb";
-    statusMsg.innerText = "PDF 생성 및 이메일 전송 중입니다...";
-
-    try {
-      const now = new Date();
-      const dateStr = now.toLocaleString("ko-KR");
-      const fileDate = now.toISOString().slice(0, 10);
-
-      // PDF 보고서 영역 데이터 채우기
-      document.getElementById("pdfMeta").innerText = `점검자: ${inspector}   |   점검일시: ${dateStr}`;
-      const tbody = document.getElementById("pdfTableBody");
-      tbody.innerHTML = "";
-      QUESTIONS.forEach((q, idx) => {
-        tbody.innerHTML += `
-          <tr>
-            <td style="text-align:center;">${idx + 1}</td>
-            <td>${q.replace(/^\d+\.\s*/, "")}</td>
-            <td class="ans" style="color:${answers[idx] === 'O' ? '#2563eb' : '#dc2626'}">${answers[idx]}</td>
-          </tr>
-        `;
-      });
-      document.getElementById("pdfImg").src = compressedImageBase64;
-
-      // HTML -> Canvas -> PDF 변환
-      const reportEl = document.getElementById("pdfReport");
-      const canvas = await html2canvas(reportEl, { scale: 1.5, useCORS: true });
-      const imgData = canvas.toDataURL("image/jpeg", 0.85);
-
-      const { jsPDF } = window.jspdf;
-      const pdf = new jsPDF("p", "mm", "a4");
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight);
-
-      // PDF Base64 문자열 추출
-      const pdfBase64 = pdf.output("datauristring").split(",")[1];
-      const fileName = `안전점검_${inspector}_${fileDate}.pdf`;
-
-      // Google Apps Script로 전송
-      await fetch(GOOGLE_SCRIPT_URL, {
-        method: "POST",
-        mode: "no-cors", // CORS 우회 전송
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          inspector: inspector,
-          date: dateStr,
-          fileName: fileName,
-          pdfBase64: pdfBase64
-        })
-      });
-
-      statusMsg.style.color = "#16a34a";
-      statusMsg.innerText = "✅ 이메일 전송이 완료되었습니다!";
-    } catch (error) {
-      console.error(error);
-      statusMsg.style.color = "#dc2626";
-      statusMsg.innerText = "❌ 전송 중 오류가 발생했습니다. 다시 시도해 주세요.";
-    } finally {
-      submitBtn.disabled = false;
-    }
-  }
-</script>
-
-</body>
-</html>
+    statusMsg.style.color = "#2563
