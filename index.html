@@ -239,4 +239,72 @@
     }
 
     submitBtn.disabled = true;
-    statusMsg.style.color = "#2563
+    statusMsg.style.color = "#2563eb";
+    statusMsg.innerText = "PDF 생성 및 이메일 전송 중입니다...";
+
+    try {
+      const now = new Date();
+      const dateStr = now.toLocaleString("ko-KR");
+      const fileDate = now.toISOString().slice(0, 10);
+
+      // PDF 보고서 상단 점검자 성명 및 일시 반영
+      document.getElementById("pdfInspector").textContent = inspector;
+      document.getElementById("pdfDate").textContent = dateStr;
+
+      const tbody = document.getElementById("pdfTableBody");
+      tbody.innerHTML = "";
+      QUESTIONS.forEach((q, idx) => {
+        tbody.innerHTML += `
+          <tr>
+            <td style="text-align:center;">${idx + 1}</td>
+            <td>${q.replace(/^\d+\.\s*/, "")}</td>
+            <td class="ans" style="color:${answers[idx] === 'O' ? '#2563eb' : '#dc2626'}">${answers[idx]}</td>
+          </tr>
+        `;
+      });
+
+      document.getElementById("pdfMemoText").textContent = memo ? memo : "특이사항 없음";
+      document.getElementById("pdfImg").src = compressedImageBase64;
+
+      // 이미지 렌더링 대기 후 캡처
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      const reportEl = document.getElementById("pdfReport");
+      const canvas = await html2canvas(reportEl, { scale: 1.5, useCORS: true });
+      const imgData = canvas.toDataURL("image/jpeg", 0.85);
+
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight);
+
+      const pdfBase64 = pdf.output("datauristring").split(",")[1];
+      const fileName = `안전점검_${inspector}_${fileDate}.pdf`;
+
+      await fetch(GOOGLE_SCRIPT_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          inspector: inspector,
+          date: dateStr,
+          fileName: fileName,
+          pdfBase64: pdfBase64
+        })
+      });
+
+      statusMsg.style.color = "#16a34a";
+      statusMsg.innerText = `✅ [${inspector}] 님의 점검 결과 전송이 완료되었습니다!`;
+    } catch (error) {
+      console.error(error);
+      statusMsg.style.color = "#dc2626";
+      statusMsg.innerText = "❌ 전송 중 오류가 발생했습니다. 다시 시도해 주세요.";
+    } finally {
+      submitBtn.disabled = false;
+    }
+  }
+</script>
+
+</body>
+</html>
