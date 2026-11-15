@@ -1,0 +1,25 @@
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents);
+    const recipient = "수신할_이메일@gmail.com"; // ← 결과를 받을 이메일 주소 입력
+    const subject = `[안전점검 결과] ${data.inspector} (${data.date})`;
+    const body = `점검자: ${data.inspector}\n점검일시: ${data.date}\n\n첨부된 PDF 안전 점검 결과지를 확인해 주세요.`;
+
+    // Base64 PDF 데이터를 첨부파일(Blob)로 변환
+    const pdfBytes = Utilities.base64Decode(data.pdfBase64);
+    const pdfBlob = Utilities.newBlob(pdfBytes, "application/pdf", data.fileName);
+
+    MailApp.sendEmail({
+      to: recipient,
+      subject: subject,
+      body: body,
+      attachments: [pdfBlob]
+    });
+
+    return ContentService.createTextOutput(JSON.stringify({ status: "success" }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
