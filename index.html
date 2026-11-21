@@ -21,9 +21,59 @@
     body { margin: 0; padding: 16px; background: var(--bg); color: var(--text); }
     .container { max-width: 540px; margin: 0 auto; background: var(--card); padding: 20px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
     h1 { font-size: 20px; margin: 0 0 16px; text-align: center; color: #0f172a; }
-    .meta-group { margin-bottom: 16px; }
+    .meta-group { margin-bottom: 14px; }
     .meta-group label, .memo-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: #475569; }
     .meta-group input { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 15px; }
+
+    /* 검색 + 드롭다운 콤보박스 스타일 */
+    .combo-wrapper { position: relative; }
+    .combo-input-box { position: relative; display: flex; align-items: center; }
+    .combo-input-box input {
+      width: 100%;
+      padding: 10px 36px 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 15px;
+      background: #fff;
+    }
+    .combo-input-box input:focus { outline: none; border-color: var(--primary); }
+    .combo-arrow {
+      position: absolute;
+      right: 12px;
+      font-size: 12px;
+      color: #64748b;
+      pointer-events: none;
+    }
+    .combo-dropdown {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      max-height: 230px;
+      overflow-y: auto;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+      z-index: 1000;
+      display: none;
+    }
+    .combo-dropdown.open { display: block; }
+    .combo-item {
+      padding: 10px 12px;
+      font-size: 14px;
+      border-bottom: 1px solid #f1f5f9;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+    .combo-item:last-child { border-bottom: none; }
+    .combo-item:hover, .combo-item.selected { background: #eff6ff; }
+    .combo-vendor { font-weight: 700; color: #1e3a8a; font-size: 13px; white-space: nowrap; }
+    .combo-stall { color: #334155; font-size: 14px; text-align: right; }
+    .combo-empty { padding: 12px; text-align: center; color: #94a3b8; font-size: 13px; }
     
     .question-item { padding: 14px 0; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 12px; }
     .question-text { font-size: 14px; line-height: 1.4; flex: 1; font-weight: 500; }
@@ -61,12 +111,14 @@
     #pdfReport h2 { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 14px; }
     .pdf-info-box {
       display: flex;
+      flex-wrap: wrap;
       justify-content: space-between;
+      gap: 8px;
       background: #f1f5f9;
       border: 1px solid #333;
       padding: 10px 14px;
       margin-bottom: 14px;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: bold;
     }
     #pdfReport table { width: 100%; border-collapse: collapse; margin-bottom: 14px; font-size: 13px; }
@@ -91,6 +143,18 @@
 
 <div class="container">
   <h1>📋 일일 안전 점검 리스트</h1>
+
+  <!-- 업체 / 가판 검색 + 드롭다운 선택 -->
+  <div class="meta-group">
+    <label for="storeSearchInput">점검 대상 (업체별 지정 / 기존 가판명 검색 및 선택)</label>
+    <div class="combo-wrapper" id="storeComboWrapper">
+      <div class="combo-input-box">
+        <input type="text" id="storeSearchInput" placeholder="업체명 또는 가판명 검색 및 선택..." autocomplete="off" />
+        <span class="combo-arrow">▼</span>
+      </div>
+      <div class="combo-dropdown" id="storeDropdown"></div>
+    </div>
+  </div>
 
   <div class="meta-group">
     <label for="inspectorName">점검자 성명</label>
@@ -190,6 +254,7 @@
 <div id="pdfReport">
   <h2>일일 안전 점검 결과 보고서</h2>
   <div class="pdf-info-box">
+    <span>점검 대상: <span id="pdfStore">-</span></span>
     <span>점검자 성명: <span id="pdfInspector">-</span></span>
     <span>점검 일시: <span id="pdfDate">-</span></span>
   </div>
@@ -216,6 +281,101 @@
 <script>
   // ★ 본인의 Google Apps Script 웹 앱 URL을 아래 따옴표 안에 붙여넣으세요 ★
   const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwTpgy8euCn9B1Q6o46_9rqQDcrNDoP4bnJ-2uMbmEHL3dplNmvm8ksQjjmjjcZmhPt/exec";
+
+  // 34개 업체별 지정 / 기존 가판명 데이터
+  const STORE_LIST = [
+    { no: 1, vendor: "BBQ", stall: "BBQ(스카이크루즈)" },
+    { no: 2, vendor: "CGV", stall: "모노브레드(공연장)" },
+    { no: 3, vendor: "CGV", stall: "오징어(공연장)" },
+    { no: 4, vendor: "CGV", stall: "CGV(락스빌)" },
+    { no: 5, vendor: "HS마켓", stall: "이레(로봇VR)" },
+    { no: 6, vendor: "HS마켓", stall: "이레(트레일러)" },
+    { no: 7, vendor: "HS마켓", stall: "오오츄(스노우)" },
+    { no: 8, vendor: "HS마켓", stall: "앤티앤스프레즐(스노우)" },
+    { no: 9, vendor: "다정식품", stall: "소프트(몽키밸리1)" },
+    { no: 10, vendor: "다정식품", stall: "이레(AWS)" },
+    { no: 11, vendor: "다정식품", stall: "이레(정문) ※ 푸드트럭" },
+    { no: 12, vendor: "다정식품", stall: "이레(푸드트럭)" },
+    { no: 13, vendor: "미스터밀크", stall: "소프트(비룡2)" },
+    { no: 14, vendor: "미스터밀크", stall: "소프트(사파리)" },
+    { no: 15, vendor: "미스터밀크", stall: "소프트(스낵버스터)" },
+    { no: 16, vendor: "미스터밀크", stall: "소프트(정문)" },
+    { no: 17, vendor: "미스터밀크", stall: "소프트(포시즌가든)" },
+    { no: 18, vendor: "미스터밀크", stall: "나루아토(소다파운틴)" },
+    { no: 19, vendor: "미스터밀크", stall: "아이스쿨(소다파운틴)" },
+    { no: 20, vendor: "앤티앤스", stall: "앤티앤스프레즐(매장)" },
+    { no: 21, vendor: "오마뎅", stall: "카페(굿프렌즈캐빈)" },
+    { no: 22, vendor: "오마뎅", stall: "구슬(콜럼버스)" },
+    { no: 23, vendor: "오마뎅", stall: "아이스쿨(스낵버스터)" },
+    { no: 24, vendor: "오마뎅", stall: "오오츄(로스트밸리)" },
+    { no: 25, vendor: "오오츄", stall: "오오츄(라피아자)" },
+    { no: 26, vendor: "오오츄", stall: "오오츄(락스빌)" },
+    { no: 27, vendor: "오크베리", stall: "구슬(티티카카)" },
+    { no: 28, vendor: "오크베리", stall: "아이스쿨(티티카카)" },
+    { no: 29, vendor: "쥬시", stall: "소프트(코스타스)" },
+    { no: 30, vendor: "쥬시", stall: "소프트(회전목마)" },
+    { no: 31, vendor: "쥬시", stall: "구슬(공연장)" },
+    { no: 32, vendor: "쥬시", stall: "소떡소떡(뮤직가든)" },
+    { no: 33, vendor: "쥬시", stall: "쿠치나(장미원)" },
+    { no: 34, vendor: "카페아모제", stall: "아모제" }
+  ];
+
+  // 검색 + 드롭다운 콤보박스 로직
+  const storeInput = document.getElementById("storeSearchInput");
+  const storeDropdown = document.getElementById("storeDropdown");
+  let selectedStoreText = "";
+
+  function renderDropdown(keyword) {
+    const query = (keyword || "").trim().toLowerCase();
+    const filtered = STORE_LIST.filter(item =>
+      item.vendor.toLowerCase().includes(query) ||
+      item.stall.toLowerCase().includes(query) ||
+      String(item.no).includes(query)
+    );
+
+    if (filtered.length === 0) {
+      storeDropdown.innerHTML = "<div class='combo-empty'>일치하는 업체 또는 가판명이 없습니다.</div>";
+      return;
+    }
+
+    storeDropdown.innerHTML = "";
+    filtered.forEach(item => {
+      const fullLabel = "[" + item.vendor + "] " + item.stall;
+      const div = document.createElement("div");
+      div.className = "combo-item" + (selectedStoreText === fullLabel ? " selected" : "");
+      div.innerHTML =
+        "<span class='combo-vendor'>" + item.no + ". " + item.vendor + "</span>" +
+        "<span class='combo-stall'>" + item.stall + "</span>";
+      div.addEventListener("click", function() {
+        selectedStoreText = fullLabel;
+        storeInput.value = fullLabel;
+        storeDropdown.classList.remove("open");
+      });
+      storeDropdown.appendChild(div);
+    });
+  }
+
+  // 입력창 포커스 시 전체 또는 필터링된 드롭다운 열기
+  storeInput.addEventListener("focus", function() {
+    // 이미 선택된 상태면 전체 목록도 볼 수 있도록 빈 검색어로 목록 렌더링
+    const isExactMatch = STORE_LIST.some(item => ("[" + item.vendor + "] " + item.stall) === storeInput.value);
+    renderDropdown(isExactMatch ? "" : storeInput.value);
+    storeDropdown.classList.add("open");
+  });
+
+  // 타이핑 시 실시간 검색 필터링
+  storeInput.addEventListener("input", function() {
+    selectedStoreText = storeInput.value.trim();
+    renderDropdown(storeInput.value);
+    storeDropdown.classList.add("open");
+  });
+
+  // 바깥 영역 클릭 시 드롭다운 닫기
+  document.addEventListener("click", function(e) {
+    if (!document.getElementById("storeComboWrapper").contains(e.target)) {
+      storeDropdown.classList.remove("open");
+    }
+  });
 
   const answers = [null, null, null, null, null, null, null, null, null, null];
   let compressedImageBase64 = "";
@@ -259,11 +419,17 @@
   });
 
   async function generateAndSend() {
+    const storeName = storeInput.value.trim();
     const inspector = document.getElementById("inspectorName").value.trim();
     const memo = document.getElementById("memoInput").value.trim();
     const statusMsg = document.getElementById("statusMsg");
     const submitBtn = document.getElementById("submitBtn");
 
+    if (!storeName) {
+      alert("점검 대상(업체/가판명)을 선택하거나 입력해 주세요.");
+      storeInput.focus();
+      return;
+    }
     if (!inspector) {
       alert("점검자 성명을 입력해 주세요.");
       document.getElementById("inspectorName").focus();
@@ -287,6 +453,7 @@
       const dateStr = now.toLocaleString("ko-KR");
       const fileDate = now.toISOString().slice(0, 10);
 
+      document.getElementById("pdfStore").textContent = storeName;
       document.getElementById("pdfInspector").textContent = inspector;
       document.getElementById("pdfDate").textContent = dateStr;
 
@@ -321,14 +488,15 @@
       pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight);
 
       const pdfBase64 = pdf.output("datauristring").split(",")[1];
-      const fileName = "안전점검_" + inspector + "_" + fileDate + ".pdf";
+      const safeStoreName = storeName.replace(/[\\/:*?"<>|]/g, "_");
+      const fileName = "안전점검_" + safeStoreName + "_" + inspector + "_" + fileDate + ".pdf";
 
       await fetch(GOOGLE_SCRIPT_URL, {
         method: "POST",
         mode: "no-cors",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          inspector: inspector,
+          inspector: inspector + " (" + storeName + ")",
           date: dateStr,
           fileName: fileName,
           pdfBase64: pdfBase64
@@ -336,7 +504,7 @@
       });
 
       statusMsg.style.color = "#16a34a";
-      statusMsg.innerText = "✅ [" + inspector + "] 님의 점검 결과 전송이 완료되었습니다!";
+      statusMsg.innerText = "✅ [" + storeName + " / " + inspector + "] 점검 결과 전송이 완료되었습니다!";
     } catch (error) {
       console.error(error);
       statusMsg.style.color = "#dc2626";
